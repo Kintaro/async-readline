@@ -124,7 +124,6 @@ impl ReadlineInner {
                     )
             }
 
-            // FIXME: 0 means EOF?
             let bytes_read = try_nb!(self.stdin.read(&mut tmp_buf));
 
             for ch in &tmp_buf[..bytes_read] {
@@ -163,12 +162,10 @@ impl futures::Stream for Lines {
     type Error = io::Error;
 
     fn poll(&mut self) -> futures::Poll<Option<Self::Item>, Self::Error> {
-        if let Async::Ready(mut guard) = self.inner.poll_lock() {
-            guard.poll_command()
-        } else {
-            Ok(Async::NotReady)
+        match self.inner.poll_lock() {
+            Async::Ready(mut guard) => guard.poll_command(),
+            _ => Ok(Async::NotReady)
         }
-
     }
 }
 
@@ -177,18 +174,16 @@ impl futures::Sink for Writer {
     type SinkError = io::Error;
 
     fn start_send(&mut self, item: Self::SinkItem) -> futures::StartSend<Self::SinkItem, io::Error> {
-        if let Async::Ready(mut guard) = self.inner.poll_lock() {
-            guard.start_write(item)
-        } else {
-            Ok(AsyncSink::NotReady(item))
-        }
+        match self.inner.poll_lock() {
+            Async::Ready(mut guard) => guard.start_write(item),
+            _ => Ok(AsyncSink::NotReady(item))   
+        } 
     }
 
     fn poll_complete(&mut self) -> futures::Poll<(), io::Error> {
-        if let Async::Ready(mut guard) = self.inner.poll_lock() {
-            guard.poll_write_complete()
-        } else {
-            Ok(Async::NotReady)
+        match self.inner.poll_lock() {
+            Async::Ready(mut guard) => guard.poll_write_complete(),
+            _ => Ok(Async::NotReady)
         }
     }
 }
